@@ -224,16 +224,6 @@ func onDropColumn(t *meta.Meta, job *model.Job) (ver int64, _ error) {
 		job.SchemaState = model.StateWriteOnly
 		colInfo.State = model.StateWriteOnly
 
-		// Set this column's offset to the last and reset all following columns' offsets.
-		adjustColumnInfoInDropColumn(tblInfo, colInfo.Offset)
-
-		if colInfo.OriginDefaultValue == nil && mysql.HasNotNullFlag(colInfo.Flag) {
-			colInfo.OriginDefaultValue, err = generateOriginDefaultValue(colInfo)
-			if err != nil {
-				return ver, errors.Trace(err)
-			}
-		}
-
 		ver, err = updateVersionAndTableInfoWithCheck(t, job, tblInfo, originalState != colInfo.State)
 	case model.StateWriteOnly:
 		// write only -> delete only
@@ -250,6 +240,14 @@ func onDropColumn(t *meta.Meta, job *model.Job) (ver int64, _ error) {
 	case model.StateDeleteReorganization:
 		// reorganization -> absent
 		// All reorganization jobs are done, drop this column.
+
+		adjustColumnInfoInDropColumn(tblInfo, colInfo.Offset)
+		if colInfo.OriginDefaultValue == nil && mysql.HasNotNullFlag(colInfo.Flag) {
+			colInfo.OriginDefaultValue, err = generateOriginDefaultValue(colInfo)
+			if err != nil {
+				return ver, errors.Trace(err)
+			}
+		}
 		tblInfo.Columns = tblInfo.Columns[:len(tblInfo.Columns)-1]
 		colInfo.State = model.StateNone
 		ver, err = updateVersionAndTableInfo(t, job, tblInfo, originalState != colInfo.State)
