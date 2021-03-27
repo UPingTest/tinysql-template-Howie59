@@ -36,14 +36,14 @@ type joinGroupNonEqEdge struct {
 }
 
 func (s *joinReorderDPSolver) solve(joinGroup []LogicalPlan, eqConds []expression.Expression) (LogicalPlan, error) {
-	// TODO: You need to implement the join reorder algo based on DP.
-
+	// TODO: undone
 	// The pseudo code can be found in README.
 	// And there's some common struct and method like `baseNodeCumCost`, `calcJoinCumCost` you can use in `rule_join_reorder.go`.
 	// Also, you can take a look at `rule_join_reorder_greedy.go`, this file implement the join reorder algo based on greedy algorithm.
 	// You'll see some common usages in the greedy version.
 
 	// Note that the join tree may be disconnected. i.e. You need to consider the case `select * from t, t1, t2`.
+
 	return nil, errors.Errorf("unimplemented")
 }
 
