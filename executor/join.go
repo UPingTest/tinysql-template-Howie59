@@ -146,14 +146,40 @@ func (e *HashJoinExec) Next(ctx context.Context, req *chunk.Chunk) (err error) {
 }
 
 func (e *HashJoinExec) fetchAndBuildHashTable(ctx context.Context) error {
-	// TODO: Implementing the building hash table stage.
+	// Done
 
-	// In this stage, you'll read the data from the inner side executor of the join operator and
-	// then use its data to build hash table.
+	// add idx
+	innerKeyColIdx := make([]int, len(e.innerKeys))
+	for i := range e.innerKeys {
+		innerKeyColIdx[i] = e.innerKeys[i].Index
+	}
 
-	// You'll need to store the hash table in `e.rowContainer`
-	// and you can call `newHashRowContainer` in `executor/hash_table.go` to build it.
-	// In this stage you can only assign value for `e.rowContainer` without changing any value of the `HashJoinExec`.
+	// get all types for init hash
+	allTys := e.innerSideExec.base().retFieldTypes
+	hCtx := &hashContext{
+		allTypes:  allTys,
+		keyColIdx: innerKeyColIdx,
+	}
+
+	// init row container
+	e.rowContainer = newHashRowContainer(e.ctx, int(e.innerSideEstCount), hCtx, chunk.NewList(allTys, e.initCap, e.maxChunkSize))
+
+	for {
+		// init chunk
+		chk := chunk.NewChunkWithCapacity(e.innerSideExec.base().retFieldTypes, e.maxChunkSize)
+		// get next
+		if err := Next(ctx, e.innerSideExec, chk); err != nil {
+			return err
+		}
+		if chk.NumRows() == 0 {
+			return nil
+		}
+		// put the chunk into container
+		if err := e.rowContainer.PutChunk(chk); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
