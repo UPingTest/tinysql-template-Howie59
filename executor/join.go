@@ -267,15 +267,51 @@ func (e *HashJoinExec) fetchAndProbeHashTable(ctx context.Context) {
 }
 
 func (e *HashJoinExec) runJoinWorker(workerID uint, outerKeyColIdx []int) {
-	// TODO: Implement the worker of probing stage.
+	// Done
+	var (
+		outerSideRes *chunk.Chunk
+		selected     = make([]bool, 0, chunk.InitialCapacity)
+	)
 
-	// In this method, you read the data from the channel e.outerResultChs[workerID].
-	// Then use `e.join2Chunk` method get the joined result `joinResult`,
-	// and put the `joinResult` into the channel `e.joinResultCh`.
+	// read the data from the channel
+	ok, joinResult := e.getNewJoinResult(workerID)
+	if !ok {
+		return
+	}
+	emptyOuterSideRes := &outerChkResource{
+		dest: e.outerResultChs[workerID],
+	}
+	hCtx := &hashContext{
+		allTypes:  e.outerSideExec.base().retFieldTypes,
+		keyColIdx: outerKeyColIdx,
+	}
 
-	// You may pay attention to:
-	//
-	// - e.closeCh, this is a channel tells that the join can be terminated as soon as possible.
+	for {
+		select {
+		case <-e.closeCh:
+			return
+		case outerSideRes, ok = <-e.outerResultChs[workerID]:
+		}
+		if !ok {
+			break
+		}
+		// get the joined result
+		ok, joinResult = e.join2Chunk(workerID, outerSideRes, hCtx, joinResult, selected)
+		if !ok {
+			break
+		}
+		outerSideRes.Reset()
+		// send 2 outerChkResourceCh
+		emptyOuterSideRes.chk = outerSideRes
+		e.outerChkResourceCh <- emptyOuterSideRes
+	}
+	if joinResult == nil {
+		return
+	} else if joinResult.err != nil || (joinResult.chk != nil && joinResult.chk.NumRows() > 0) {
+		// put joinResult into joinResultCh
+		e.joinResultCh <- joinResult
+	}
+
 }
 
 func (e *HashJoinExec) getNewJoinResult(workerID uint) (bool, *hashjoinWorkerResult) {
